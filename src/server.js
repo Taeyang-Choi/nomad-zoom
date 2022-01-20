@@ -15,13 +15,17 @@ const handleListen = () => console.log(`listening on http://localhost:3000, ws:/
 const server = http.createServer(app);
 const wss = new WebSocket.Server({server});
 
+const sockets = [];
+
 wss.on("connection", (socket) => { // 연결된 브라우저 socket
+    sockets.push(socket);
     console.log("connected to browser");
     socket.on("close", () => console.log("disconnected from the browser"))
     socket.on("message", (message) => {
-        console.log(message.toString("utf8"));
-    })
-    socket.send("hello");
+        sockets.forEach(socket => {
+            socket.send(message.toString("utf8"));
+        })
+    });
 });
 
 

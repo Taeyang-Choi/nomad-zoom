@@ -19,12 +19,21 @@ const sockets = [];
 
 wss.on("connection", (socket) => { // 연결된 브라우저 socket
     sockets.push(socket);
+    socket["nickname"] = "anon-" + Math.floor(Math.random() * 100000);
     console.log("connected to browser");
     socket.on("close", () => console.log("disconnected from the browser"))
-    socket.on("message", (message) => {
-        sockets.forEach(socket => {
-            socket.send(message.toString("utf8"));
-        })
+    socket.on("message", (data) => {
+        const message = JSON.parse(data);
+        switch (message.type) {
+            case "new_message":
+                sockets.forEach(soc => {
+                    soc.send(`${socket.nickname}: ${message.payload}`);
+                })
+                break;
+            case "nickname":
+                socket["nickname"] = message.payload;
+                break;
+        }
     });
 });
 

@@ -21,13 +21,15 @@ wss.on("connection", (socket) => { // 연결된 브라우저 socket
     sockets.push(socket);
     socket["nickname"] = "anon-" + Math.floor(Math.random() * 100000);
     console.log("connected to browser");
+    socket.send(makeMessage("nick", socket.nickname));
+
     socket.on("close", () => console.log("disconnected from the browser"))
     socket.on("message", (data) => {
         const message = JSON.parse(data);
         switch (message.type) {
             case "new_message":
-                sockets.forEach(soc => {
-                    soc.send(`${socket.nickname}: ${message.payload}`);
+                sockets.filter(soc => soc.nickname !== socket.nickname).forEach(soc => {
+                    soc.send(makeMessage("new_message", `${socket.nickname}: ${message.payload}`));
                 })
                 break;
             case "nickname":
@@ -39,3 +41,8 @@ wss.on("connection", (socket) => { // 연결된 브라우저 socket
 
 
 server.listen(3000, handleListen);
+
+function makeMessage(type, payload) {
+    const msg = {type, payload};
+    return JSON.stringify(msg);
+}

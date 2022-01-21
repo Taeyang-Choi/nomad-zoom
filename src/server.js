@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
-import SocketIO from "socket.io";
+import Server from "socket.io";
+import {instrument} from "@socket.io/admin-ui";
 
 const app = express();
 app.set("view engine", "pug");
@@ -13,7 +14,16 @@ app.get("/*", (_, res)=> res.redirect("/"))
 const handleListen = () => console.log(`listening on http://localhost:3000, ws://localhost:3000`);
 
 const httpServer = http.createServer(app);
-const wsServer = SocketIO(httpServer);
+const wsServer = Server(httpServer, {
+    cors: {
+        origin: ["https://admin.socket.io"],
+        credential: true,
+    }
+});
+
+instrument(wsServer, {
+    auth: false,
+});
 
 function publicRooms() {
     const {
@@ -32,18 +42,22 @@ function publicRooms() {
     return publicRooms;
 }
 
+function countRoom(roomName) {
+    return wsServer.sockets.adapter.rooms.get(roomName)?.size;
+}
+
 wsServer.on("connection", socket => {
     socket.onAny((event) => {
     });
     socket.on("enter_room", (data, done) => {
         socket.join(data.roomname);
         socket["nickname"] = data.nickname;
-        done();
-        socket.to(data.roomname).emit("welcome", socket.nickname);
+        done(countRoom(data.roomname));
+        socket.to(data.roomname).emit("welcome", socket.nickname, countRoom(data.roomname));
         wsServer.sockets.emit("room_change", publicRooms());
     });
     socket.on("disconnecting", () => {
-        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
+        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1));
     });
     socket.on("disconnect", () => {
         wsServer.sockets.emit("room_change", publicRooms());
@@ -54,30 +68,6 @@ wsServer.on("connection", socket => {
     });
     socket.on("nickname", nickname => socket["nickname"] = nickname);
 })
-
-/*const sockets = [];
-wss.on("connection", (socket) => { // 연결된 브라우저 socket
-    sockets.push(socket);
-    socket["nickname"] = "anon-" + Math.floor(Math.random() * 100000);
-    console.log("connected to browser");
-    socket.send(makeMessage("nick", socket.nickname));
-
-    socket.on("close", () => console.log("disconnected from the browser"))
-    socket.on("message", (data) => {
-        const message = JSON.parse(data);
-        switch (message.type) {
-            case "new_message":
-                sockets.filter(soc => soc.nickname !== socket.nickname).forEach(soc => {
-                    soc.send(makeMessage("new_message", `${socket.nickname}: ${message.payload}`));
-                })
-                break;
-            case "nickname":
-                socket["nickname"] = message.payload;
-                break;
-        }
-    });
-});*/
-
 
 httpServer.listen(3000, handleListen);
 
